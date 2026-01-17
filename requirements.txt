@@ -1,0 +1,14 @@
+# Data Acquisition
+nba_api>=1.4.1
+requests>=2.31.0
+
+# Data Processing & Math
+pandas>=2.2.0
+numpy>=1.26.4
+
+# Database & Storage
+SQLAlchemy>=2.0.25
+
+# Utility & Development
+python-dotenv>=1.0.1
+tqdm>=4.66.1
