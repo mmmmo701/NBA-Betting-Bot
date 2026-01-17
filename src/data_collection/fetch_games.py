@@ -6,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from database_setup import init_db, Team, Game
 
 def populate_teams(session):
-    """Fetches all 30 NBA teams and saves them to the DB."""
     nba_teams = teams.get_teams()
     for t in nba_teams:
         team_obj = Team(
@@ -16,56 +15,66 @@ def populate_teams(session):
             nickname=t['nickname'],
             city=t['city']
         )
-        session.merge(team_obj) # merge prevents duplicates
+        session.merge(team_obj)
     session.commit()
+    print("Core 30 teams synchronized.")
 
 def fetch_and_save_season(session, season_year):
-    """Downloads all games for a specific season (e.g., '2023')."""
-    print(f"--- Fetching Season {season_year}-{int(season_year)+1} ---")
+    print(f"Fetching Season: {season_year}")
     
-    # LeagueGameLog gets every game for every team
+    # 1. Get every team's game log for the season
+    # This returns a DataFrame where every game has TWO rows.
     log = leaguegamelog.LeagueGameLog(
         season=season_year, 
         season_type_all_star='Regular Season'
     ).get_data_frames()[0]
 
-    # The API gives 2 rows per game (one for each team). 
-    # We consolidate this into one row (Home vs Away) for our 'games' table.
-    processed_games = []
-    
-    # Simple logic: only grab the 'Home' side of matchups to avoid duplicates
-    home_games = log[log['MATCHUP'].str.contains('vs.')]
+    # 2. Split the logs into Home and Away sets
+    # In NBA Matchup strings, '@' means Away, 'vs.' means Home
+    home_games = log[log['MATCHUP'].str.contains('vs.')].copy()
+    away_games = log[log['MATCHUP'].str.contains('@')].copy()
 
-    for _, row in home_games.iterrows():
-        # Identify the Away Team from the matchup string (e.g., 'LAL vs. BOS')
-        matchup = row['MATCHUP']
-        away_team_abbr = matchup.split(' vs. ')[1]
-        
-        # We need a quick lookup to get Away Team ID from abbreviation
-        # (For brevity, this assumes you've loaded teams already)
-        
-        game_obj = Game(
+    # 3. Rename columns so we can join them (Merging two structs by Game_ID)
+    home_games = home_games[['GAME_ID', 'GAME_DATE', 'TEAM_ID', 'PTS', 'WL', 'SEASON_ID']]
+    home_games.columns = ['GAME_ID', 'GAME_DATE', 'HOME_TEAM_ID', 'HOME_PTS', 'WL_HOME', 'SEASON_ID']
+    
+    away_games = away_games[['GAME_ID', 'TEAM_ID', 'PTS']]
+    away_games.columns = ['GAME_ID', 'AWAY_TEAM_ID', 'AWAY_PTS']
+
+    # 4. Join them (Like a Hash Join in 15-122)
+    # We match the Home row with the Away row where GAME_ID is identical
+    merged = pd.merge(home_games, away_games, on='GAME_ID')
+
+    # 5. Iteratively save to our SQL 'struct array'
+    for _, row in merged.iterrows():
+        new_game = Game(
             game_id=row['GAME_ID'],
             game_date=pd.to_datetime(row['GAME_DATE']),
             season_id=row['SEASON_ID'],
-            home_team_id=row['TEAM_ID'],
-            home_pts=row['PTS'],
-            wl_home=row['WL']
-            # Note: A real production script would lookup the Away ID here too.
+            home_team_id=int(row['HOME_TEAM_ID']),
+            away_team_id=int(row['AWAY_TEAM_ID']),
+            home_pts=int(row['HOME_PTS']),
+            away_pts=int(row['AWAY_PTS']),
+            wl_home=row['WL_HOME']
         )
-        session.merge(game_obj)
+        session.merge(new_game)
     
     session.commit()
-    time.sleep(1) # Respect Rate Limits
+    print(f"Successfully saved {len(merged)} games for {season_year}.")
+    time.sleep(1.5) # The "Don't get banned" timer
 
 if __name__ == "__main__":
+    # Initialize connection
     engine = init_db()
     Session = sessionmaker(bind=engine)
     session = Session()
     
+    # Run the process
     populate_teams(session)
-    # Start with a small sample: the last 2 seasons
-    for year in ['2023', '2024']:
-        fetch_and_save_season(session, year)
     
-    print("✅ Initial data load complete.")
+    # Let's get the last 3 seasons for a solid training set
+    seasons = ['2022', '2023', '2024']
+    for s in seasons:
+        fetch_and_save_season(session, s)
+        
+    print("\nPipeline Complete. Your database is now populated.")
