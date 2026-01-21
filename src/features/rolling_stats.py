@@ -1,6 +1,26 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy.ext.declarative import declarative_base
 from src.data_collection.database_setup import init_db
+
+Base = declarative_base()
+
+# This class defines the "Contract" for the SQL table
+class Features(Base):
+    __tablename__ = 'model_ready_features'
+    # Removed the 'pd.' prefixes. These are SQLAlchemy types.
+    game_id = Column(String, primary_key=True)
+    team_id = Column(Integer, primary_key=True)
+    rolling_ppg = Column(Float)
+    rolling_opp_ppg = Column(Float)
+    rolling_win_pct = Column(Float)
+    rest_days = Column(Integer)
+
+def make_sql_table():
+    engine = init_db()
+    # This acts like a 'malloc' for your SQL table structure
+    Base.metadata.create_all(engine)
+
 
 def calculate_basic_rolling_features(window_size=10):
     engine = create_engine('sqlite:///data/nba_stats.db')
@@ -63,4 +83,5 @@ def calculate_basic_rolling_features(window_size=10):
     print(f"✅ Success! Generated 'model_ready_features' using basic box scores.")
 
 if __name__ == "__main__":
+    make_sql_table()
     calculate_basic_rolling_features()

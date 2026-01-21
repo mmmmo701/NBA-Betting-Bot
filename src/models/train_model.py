@@ -3,7 +3,7 @@ import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from sqlalchemy import create_engine
-from src.models.save_model import save_nba_model
+from save_model import save_nba_model
 
 # Loads feature data from SQL into a Pandas DataFrame
 def load_data(db_path="sqlite:///data/nba_stats.db"):
