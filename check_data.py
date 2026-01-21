@@ -16,3 +16,10 @@ print(f"Total Games: {games_df['game_count'][0]}")
 preview_df = pd.read_sql("SELECT * FROM games ORDER BY game_date DESC LIMIT 5", engine)
 print("\nRecent Games Preview:")
 print(preview_df[['game_id', 'game_date', 'home_pts', 'wl_home']])
+
+engine = create_engine('sqlite:///data/nba_stats.db')
+
+print('\nModel Ready Features Preview:')
+# This is your SQL command wrapped in a Python function
+df = pd.read_sql("SELECT * FROM model_ready_features LIMIT 5", engine)
+print(df)

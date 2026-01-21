@@ -3,7 +3,7 @@ import pandas as pd
 from nba_api.stats.static import teams
 from nba_api.stats.endpoints import leaguegamelog
 from sqlalchemy.orm import sessionmaker
-from database_setup import init_db, Team, Game
+from src.data_collection.database_setup import init_db, Team, Game
 
 def populate_teams(session):
     nba_teams = teams.get_teams()
